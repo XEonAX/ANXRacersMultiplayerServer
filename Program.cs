@@ -8,6 +8,7 @@ await Host
 .ConfigureServices((builder, services)=>{
     Console.WriteLine($"Configuring Services");
     services.Configure<Configs>(builder.Configuration.GetRequiredSection("Configs"));
+    services.AddTransient<MultiplayerServer>();
+    services.AddHostedService<ServerHost>();
 })
 .RunConsoleAsync();
-
