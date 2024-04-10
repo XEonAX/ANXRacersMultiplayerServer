@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// This hosted service sets up timers that very frequently poll for receiving updates,
@@ -8,28 +9,34 @@ using Microsoft.Extensions.Logging;
 /// </summary>
 public class ServerHost : IHostedService
 {
-    private readonly ILogger<ServerHost> logger;
+    private readonly ILogger<ServerHost> _logger;
     private Timer _timerReceive;
     private long _oldSendTimestamp;
     private Timer _timerSend;
     private IMultiplayerServer _server;
+    private readonly IStateService _stateService;
+    private readonly Configs _configs;
 
-    public ServerHost(ILogger<ServerHost> logger, IMultiplayerServer multiplayerServer)
+    public ServerHost(ILogger<ServerHost> logger, IMultiplayerServer multiplayerServer, IOptions<Configs> options, IStateService stateService)
     {
-        this.logger = logger;
+        _logger = logger;
         _server = multiplayerServer;
+        _configs = options.Value;
+        _stateService = stateService;
+        _stateService.Load();
     }
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Server Host Starting.");
-        await Task.Delay(500);
-        _server.StartServer();
+        _logger.LogInformation("Server Host Starting.");
+        await Task.Delay(500, cancellationToken);
+        if (_configs.AutoStart)
+            _server.StartServer();
         _timerReceive = new Timer(ReceiveWorker, null, TimeSpan.Zero,
             TimeSpan.FromMilliseconds(15));
         _oldSendTimestamp = Stopwatch.GetTimestamp();
         _timerSend = new Timer(SendWorker, null, TimeSpan.Zero,
             TimeSpan.FromMilliseconds(45));
-        logger.LogInformation("Server Host Running.");
+        _logger.LogInformation("Server Host Running.");
     }
 
     private void ReceiveWorker(object? state)
@@ -47,11 +54,11 @@ public class ServerHost : IHostedService
 
     public Task StopAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Server Host is stopping.");
+        _logger.LogInformation("Server Host is stopping.");
         _timerReceive?.Change(Timeout.Infinite, 0);
         _timerSend?.Change(Timeout.Infinite, 0);
         _server.StopServer();
-        logger.LogInformation("Server Host is stopped.");
+        _logger.LogInformation("Server Host is stopped.");
         return Task.CompletedTask;
     }
 

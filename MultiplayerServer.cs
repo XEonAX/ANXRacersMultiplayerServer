@@ -20,6 +20,7 @@ public class MultiplayerServer : EventBasedNetListener, IMultiplayerServer
 {
     private readonly ILogger<MultiplayerServer> _logger;
     private readonly Communications _communications;
+    private readonly IStateService _stateService;
     private readonly string _uniqueKeyForANXRacersNetPeer = Encoding.UTF8.GetString(Convert.FromBase64String("ZTlUSW1kZUJsWTZwSTR3Z0Vu"));
     NetManager litenetMgr;
     NetPacketProcessor packetProcessor;
@@ -35,11 +36,12 @@ public class MultiplayerServer : EventBasedNetListener, IMultiplayerServer
     public List<NetPeer> Peers = new List<NetPeer>();
     public List<Player> Players = new List<Player>();
     public Dictionary<uint, Player> PlayersDict = new Dictionary<uint, Player>();
-    public MultiplayerServer(ILogger<MultiplayerServer> logger, IOptions<Configs> options, Communications communications)
+    public MultiplayerServer(ILogger<MultiplayerServer> logger, IOptions<Configs> options, Communications communications, IStateService stateService)
     {
         _logger = logger;
         _communications = communications;
-        _port = options.Value.Port;
+        _stateService = stateService;
+        _port = options.Value.PortUDP;
     }
     public void StartServer()
     {
@@ -56,6 +58,7 @@ public class MultiplayerServer : EventBasedNetListener, IMultiplayerServer
         _isStarted = true;
         RegisterEventHandlers();
         _logger.LogInformation("Server started on port:{_port}", _port);
+        _stateService.State.IsServerStarted = true;
         _communications.RegisterServer();
     }
 
@@ -72,6 +75,7 @@ public class MultiplayerServer : EventBasedNetListener, IMultiplayerServer
 
     public void StopServer()
     {
+        _stateService.State.IsServerStarted = false;
         litenetMgr.Stop();
     }
 
@@ -247,6 +251,8 @@ public class MultiplayerServer : EventBasedNetListener, IMultiplayerServer
                 Peers[i].Send(packetProcessor.Write(packet), DeliveryMethod.ReliableOrdered);
             }
         }
+        var client = peer.Tag as Spectator;
+        _communications.NewScoreAndRank(client.UserId, client.UserDisplayName, packet.Time / 1000f, packet.Rank);
     }
 
     public void OnReceiveShipUpdate(PShipUpdate packet, NetPeer peer)
