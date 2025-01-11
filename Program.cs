@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Net;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -49,4 +51,24 @@ app.UseHttpsRedirection();
 app.UseCors();
 
 app.MapControllers();
+app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        foreach (var url in app.Urls)
+        {
+            Console.WriteLine($"Listening on {url}");
+            try
+            {
+                // Use the default browser to open the URL
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://studios.aeonax.com/racers/servermgr?server=" + WebUtility.UrlEncode(url.Replace("0.0.0.0", "localhost")),
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to open browser: {ex.Message}");
+            }
+        }
+    });
 app.Run();
